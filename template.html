@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>나스닥 상대강도</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F4F1; --surface:#FFFFFF; --ink:#16201A; --muted:#5F6B64; --line:#DCE2DD; --soft:#EAEEEA;
+  --up:#13804F; --down:#C0392F; --rs:#0E6B43; --rs-track:#E3EAE5; --focus:#2F6FDB;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111513; --surface:#181D1A; --ink:#E4EAE6; --muted:#93A099; --line:#2A322D; --soft:#1F2622;
+    --up:#3FBF7F; --down:#F0675C; --rs:#3FBF7F; --rs-track:#26302A; --focus:#7AA7FF;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111513; --surface:#181D1A; --ink:#E4EAE6; --muted:#93A099; --line:#2A322D; --soft:#1F2622;
+  --up:#3FBF7F; --down:#F0675C; --rs:#3FBF7F; --rs-track:#26302A; --focus:#7AA7FF;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:"IBM Plex Sans KR",system-ui,sans-serif;font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:1360px;margin:0 auto;padding:24px 16px 48px}
+
+/* 머리글 */
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px 32px;padding-bottom:20px;border-bottom:2px solid var(--ink)}
+h1{font-size:30px;line-height:1.15;font-weight:700;margin:0;letter-spacing:-0.01em}
+.asof{color:var(--muted);margin-top:6px}
+.bench{display:flex;gap:28px;flex-wrap:wrap}
+.bench div{min-width:96px}
+.bench dt{color:var(--muted);font-size:13px}
+.bench dd{margin:2px 0 0;font-size:20px;font-weight:600}
+.stats{display:flex;flex-wrap:wrap;gap:8px 28px;padding:14px 0 18px;color:var(--muted)}
+.stats b{color:var(--ink);font-weight:600}
+
+/* 본문: 섹터 패널 + 표 */
+.main{display:grid;grid-template-columns:260px minmax(0,1fr);gap:28px;align-items:start}
+.main>*{min-width:0}
+@media (max-width:900px){.main{grid-template-columns:1fr}}
+.sectors{position:sticky;top:16px}
+@media (max-width:900px){.sectors{position:static}}
+.sectors h2{font-size:15px;font-weight:600;margin:0 0 4px}
+.sectors p{margin:0 0 12px;color:var(--muted);font-size:12.5px}
+.sec{display:grid;grid-template-columns:1fr auto;gap:2px 10px;width:100%;text-align:left;background:none;border:0;border-radius:6px;padding:8px 8px;margin:0 -8px;color:inherit;font:inherit;cursor:pointer}
+.sec:hover{background:var(--soft)}
+.sec[aria-pressed="true"]{background:var(--soft);box-shadow:inset 3px 0 0 var(--rs)}
+.sec .nm{font-weight:500}
+.sec .ct{color:var(--muted);font-size:12.5px}
+.sec .bar{grid-column:1/-1;height:6px;background:var(--rs-track);border-radius:3px;overflow:hidden}
+.sec .bar i{display:block;height:100%;background:var(--rs)}
+@media (max-width:900px){
+  .seclist{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px}
+  .sec{margin:0;min-width:150px;border:1px solid var(--line);background:var(--surface)}
+}
+
+/* 도구줄 */
+.tools{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.tabs{display:flex;flex-wrap:wrap;gap:4px}
+.tab{border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;padding:6px 12px;border-radius:999px;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input[type=search],select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+input[type=search]{width:180px}
+.note{color:var(--muted);font-size:12.5px;margin:0 0 10px}
+
+/* 표 */
+.tablebox{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:auto;max-height:78vh}
+table{border-collapse:collapse;width:100%;min-width:1080px}
+th,td{padding:8px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{position:sticky;top:0;z-index:2;background:var(--surface);font-weight:500;color:var(--muted);font-size:12.5px;cursor:pointer;user-select:none}
+th[aria-sort="descending"]::after{content:" ▼";font-size:10px}
+th[aria-sort="ascending"]::after{content:" ▲";font-size:10px}
+th.l,td.l{text-align:left}
+tbody tr:hover{background:var(--soft)}
+td.tk{position:sticky;left:0;background:inherit;font-weight:600}
+tbody tr{background:var(--surface)}
+tbody tr:hover td.tk{background:var(--soft)}
+td.nm{max-width:190px;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+td.sc{color:var(--muted)}
+.chg-up{color:var(--up)} .chg-dn{color:var(--down)} .new{font-weight:600;color:var(--rs)}
+.pos{color:var(--up)} .neg{color:var(--down)}
+.rscell{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.rscell b{width:22px;text-align:right;font-weight:700}
+.rsbar{width:72px;height:8px;background:var(--rs-track);border-radius:4px;overflow:hidden}
+.rsbar i{display:block;height:100%;background:var(--rs)}
+.tr{display:inline-flex;gap:3px}
+.dot{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--muted)}
+.dot.on{background:var(--rs);border-color:var(--rs)}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+footer{margin-top:28px;color:var(--muted);font-size:12.5px;max-width:80ch}
+footer p{margin:4px 0}
+@media (max-width:600px){h1{font-size:24px}.bench dd{font-size:17px}.right,input[type=search]{width:100%}.right select{flex:0 0 auto}.right input{flex:1}
+  .c-n,.c-sec,.c-chg,td[data-c="n"],td[data-c="sec"],td[data-c="chg"]{display:none}.rsbar{width:44px}}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>나스닥 상대강도</h1>
+      <div class="asof" id="asof"></div>
+    </div>
+    <dl class="bench" id="bench"></dl>
+  </header>
+  <div class="stats" id="stats"></div>
+
+  <div class="main">
+    <aside class="sectors" aria-label="섹터 강도">
+      <h2>섹터 강도</h2>
+      <p>막대는 섹터 평균 RS, 숫자는 RS 90 이상 종목 수. 누르면 그 섹터만 봅니다.</p>
+      <div class="seclist" id="seclist"></div>
+    </aside>
+
+    <section>
+      <div class="tools">
+        <div class="tabs" role="tablist" id="tabs"></div>
+        <div class="right">
+          <select id="grp" aria-label="종목 그룹">
+            <option value="">전체 종목</option>
+            <option value="sp500">S&amp;P 500</option>
+            <option value="watchlist">관심종목</option>
+          </select>
+          <input type="search" id="q" placeholder="티커·종목명 검색" aria-label="티커 또는 종목명 검색">
+        </div>
+      </div>
+      <p class="note" id="note"></p>
+      <div class="tablebox"><table>
+        <thead><tr id="thead"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <footer>
+    <p>RS는 3개월 수익률 40%와 6·9·12개월 수익률 각 20%를 가중합해 전체 종목 중 백분위(1~99)로 매긴 점수입니다. 1주·1개월·3개월 RS는 그 기간 수익률만으로 매긴 백분위입니다.</p>
+    <p>추세 점 두 개는 왼쪽부터 50일선 위, 200일선 위 여부입니다. 변동은 직전 거래일 상위 목록 대비 순위 변화입니다.</p>
+    <p id="gen"></p>
+  </footer>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const $ = id => document.getElementById(id);
+const pct = (x, d=1) => { if (x == null) return "–"; const v = Math.round(x*Math.pow(10,d+2))/Math.pow(10,d); return (v > 0 ? "+" : v < 0 ? "" : "") + (v === 0 ? 0 : v).toFixed(d) + "%"; };
+const cls = x => x == null ? "" : x >= 0 ? "pos" : "neg";
+const money = x => !x ? "–" : x >= 1e12 ? (x/1e12).toFixed(2)+"T" : x >= 1e9 ? (x/1e9).toFixed(1)+"B" : (x/1e6).toFixed(0)+"M";
+const secKo = s => D.sectorKo[s] || s || "미분류";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const TABS = [
+  {id:"top",  label:`상위 ${D.topN}`, filter:r=>r.out, sort:"rs", limit:D.topN, rank:true,
+   note:`${D.benchName}보다 ${D.outPeriod.replace("w","주").replace("m","개월")} 수익률이 높고, 최근 3일 평균 거래대금 $${(D.minDv3/1e6).toFixed(0)}M 이상인 종목을 RS 순으로.`},
+  {id:"w1",  label:"1주 RS",   filter:()=>true, sort:"rs1w", limit:100, note:"최근 1주 수익률 상위 100."},
+  {id:"m1",  label:"1개월 RS", filter:()=>true, sort:"rs1m", limit:100, note:"최근 1개월 수익률 상위 100."},
+  {id:"m3",  label:"3개월 RS", filter:()=>true, sort:"rs3m", limit:100, note:"최근 3개월 수익률 상위 100."},
+  {id:"hi",  label:"신고가 근처", filter:r=>r.hi52 != null && r.hi52 >= -0.05 && r.rs >= 70, sort:"rs", limit:200, note:"52주 최고가 대비 -5% 이내이면서 RS 70 이상."},
+  {id:"all", label:"전체",     filter:()=>true, sort:"rs", limit:Infinity, note:"전체 종목. 열 제목을 누르면 정렬이 바뀝니다."},
+  {id:"bot", label:"하위",     filter:()=>true, sort:"rs", asc:true, limit:100, note:"RS 하위 100. 약한 종목 확인용."},
+];
+const COLS = [
+  {k:"rank", label:"#", l:false},
+  {k:"chg", label:"변동", l:false},
+  {k:"t", label:"티커", l:true},
+  {k:"n", label:"종목명", l:true},
+  {k:"sec", label:"섹터", l:true},
+  {k:"rs", label:"RS"},
+  {k:"r1w", label:"1주"}, {k:"r1m", label:"1개월"}, {k:"r3m", label:"3개월"}, {k:"r6m", label:"6개월"},
+  {k:"close", label:"종가"}, {k:"d1", label:"전일대비"},
+  {k:"mcap", label:"시총"}, {k:"dv3", label:"거래대금(3일)"},
+  {k:"hi52", label:"52주 고점 대비"},
+  {k:"trend", label:"추세", l:false},
+];
+
+let state = {tab:"top", sec:"", grp:"", q:"", sortK:null, asc:false};
+
+// 머리글
+$("asof").textContent = `${D.asof} 마감 기준 · ${D.rows.length}종목`;
+const b = D.bench, bn = D.benchName;
+$("bench").innerHTML = [[bn,"1m"],[bn,"3m"],["SPY","3m"]].map(([k,p]) =>
+  `<div><dt>${k} ${p.replace("m","개월")}</dt><dd class="${cls(b[k]?.[p])}">${pct(b[k]?.[p])}</dd></div>`).join("");
+const out = D.rows.filter(r=>r.out).length, rs90 = D.rows.filter(r=>r.rs>=90).length;
+const prevSet = new Set(Object.keys(D.prev||{}));
+const topRows = D.rows.filter(r=>r.out).sort((a,b)=>b.rs-a.rs).slice(0,D.topN);
+const newCnt = prevSet.size ? topRows.filter(r=>!prevSet.has(r.t)).length : 0;
+$("stats").innerHTML = `<span>아웃퍼폼+유동성 <b>${out}</b>종목</span><span>RS 90 이상 <b>${rs90}</b>종목</span>` +
+  (prevSet.size ? `<span>상위 ${D.topN} 신규 진입 <b>${newCnt}</b>종목</span>` : "");
+$("gen").textContent = `생성 ${D.generated}`;
+
+// 섹터 패널
+function renderSectors(){
+  const g = {};
+  D.rows.forEach(r => { const s = r.sec || ""; (g[s] ||= []).push(r); });
+  const list = Object.entries(g).map(([s, rs]) => ({s, avg: rs.reduce((a,r)=>a+(r.rs||0),0)/rs.length,
+    n90: rs.filter(r=>r.rs>=90).length, n: rs.length})).filter(x=>x.n>=3).sort((a,b)=>b.avg-a.avg);
+  $("seclist").innerHTML = `<button class="sec" data-s="" aria-pressed="${state.sec===""}"><span class="nm">전체 섹터</span><span class="ct">${D.rows.length}</span></button>` +
+    list.map(x => `<button class="sec" data-s="${esc(x.s)}" aria-pressed="${state.sec===x.s}">
+      <span class="nm">${esc(secKo(x.s))}</span><span class="ct">${x.n90} / ${x.n}</span>
+      <span class="bar" aria-hidden="true"><i style="width:${x.avg.toFixed(0)}%"></i></span></button>`).join("");
+  $("seclist").querySelectorAll(".sec").forEach(btn => btn.onclick = () => { state.sec = btn.dataset.s; renderSectors(); render(); });
+}
+
+// 탭
+$("tabs").innerHTML = TABS.map(t => `<button class="tab" role="tab" data-t="${t.id}" aria-selected="${t.id===state.tab}">${t.label}</button>`).join("");
+$("tabs").querySelectorAll(".tab").forEach(btn => btn.onclick = () => {
+  state.tab = btn.dataset.t; state.sortK = null;
+  $("tabs").querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === btn));
+  render();
+});
+$("q").oninput = e => { state.q = e.target.value.trim().toUpperCase(); render(); };
+$("grp").onchange = e => { state.grp = e.target.value; render(); };
+
+function cell(r, k){
+  switch(k){
+    case "rank": return `<td>${r._rank ?? ""}</td>`;
+    case "chg": {
+      if (!r._showChg) return `<td></td>`;
+      const p = (D.prev||{})[r.t];
+      if (!prevSet.size) return `<td>–</td>`;
+      if (p == null) return `<td class="new">NEW</td>`;
+      const d = p - r._rank;
+      return d === 0 ? `<td>–</td>` : `<td class="${d>0?"chg-up":"chg-dn"}">${d>0?"▲":"▼"}${Math.abs(d)}</td>`;
+    }
+    case "t": return `<td class="l tk">${esc(r.t)}</td>`;
+    case "n": return `<td class="l nm" title="${esc(r.n)}">${esc(r.n)}</td>`;
+    case "sec": return `<td class="l sc">${esc(secKo(r.sec))}</td>`;
+    case "rs": return `<td><span class="rscell"><span class="rsbar" aria-hidden="true"><i style="width:${r.rs||0}%"></i></span><b>${r.rs ?? "–"}</b></span></td>`;
+    case "close": return `<td>${r.close?.toFixed(2) ?? "–"}</td>`;
+    case "mcap": return `<td>${money(r.mcap)}</td>`;
+    case "dv3": return `<td>${money(r.dv3)}</td>`;
+    case "trend": return `<td><span class="tr" title="50일선 ${r.a50?"위":"아래"} / 200일선 ${r.a200?"위":r.a200===false?"아래":"없음"}"><span class="dot ${r.a50?"on":""}"></span><span class="dot ${r.a200?"on":""}"></span></span></td>`;
+    default: return `<td class="${cls(r[k])}">${pct(r[k])}</td>`;
+  }
+}
+
+function render(){
+  const tab = TABS.find(t => t.id === state.tab);
+  $("note").textContent = tab.note;
+  let rows = D.rows.filter(tab.filter);
+  const baseKey = tab.sort, baseAsc = !!tab.asc;
+  rows.sort((a,b) => ((a[baseKey] ?? -1e9) - (b[baseKey] ?? -1e9)) * (baseAsc ? 1 : -1));
+  rows = rows.slice(0, tab.limit).map((r,i) => ({...r, _rank:i+1, _showChg: !!tab.rank}));
+  if (state.sec) rows = rows.filter(r => (r.sec||"") === state.sec);
+  if (state.grp) rows = rows.filter(r => r.g === state.grp);
+  if (state.q) rows = rows.filter(r => r.t.includes(state.q) || (r.n||"").toUpperCase().includes(state.q));
+  if (state.sortK){
+    const k = state.sortK === "trend" ? null : state.sortK;
+    if (k) rows.sort((a,b) => {
+      const x = a[k], y = b[k];
+      if (typeof x === "string" || typeof y === "string") return String(x||"").localeCompare(String(y||"")) * (state.asc?1:-1);
+      return ((x ?? -1e15) - (y ?? -1e15)) * (state.asc?1:-1);
+    });
+  }
+  const cols = COLS.filter(c => tab.rank || c.k !== "chg");
+  $("thead").innerHTML = cols.map(c => {
+    const s = state.sortK === c.k ? (state.asc ? "ascending" : "descending") : "none";
+    return `<th class="${c.l?"l":""} c-${c.k}" data-k="${c.k}" aria-sort="${s}" tabindex="0">${c.label}</th>`;
+  }).join("");
+  $("thead").querySelectorAll("th").forEach(th => {
+    const go = () => { const k = th.dataset.k; if (k==="rank"||k==="chg"||k==="trend"){ state.sortK=null; } else if (state.sortK === k) state.asc = !state.asc; else { state.sortK = k; state.asc = ["t","n","sec"].includes(k); } render(); };
+    th.onclick = go; th.onkeydown = e => { if (e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } };
+  });
+  $("tbody").innerHTML = rows.length ? rows.map(r => `<tr>${cols.map(c => cell(r, c.k).replace("<td", `<td data-c="${c.k}"`)).join("")}</tr>`).join("")
+    : `<tr><td class="empty" colspan="${cols.length}">조건에 맞는 종목이 없습니다. 섹터나 검색어를 바꿔 보세요.</td></tr>`;
+}
+
+renderSectors();
+render();
+</script>
+</body>
+</html>
